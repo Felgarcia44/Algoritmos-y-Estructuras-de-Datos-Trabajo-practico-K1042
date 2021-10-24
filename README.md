@@ -1,1 +1,1 @@
-# Algoritmos-y-Estructuras-de-Datos-Trabajo-pr-ctico-K1042
+# Algoritmos-y-Estructuras-de-Datos-Trabajo-practico-K1042
