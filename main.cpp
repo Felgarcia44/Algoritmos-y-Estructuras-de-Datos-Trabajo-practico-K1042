@@ -13,18 +13,28 @@ using namespace std;
 */
 
 bool LevantoSiNo = false;
-int nRegistros = 0;   // <-- cant. de registros cargados en el array
-int nTope = 0;        // <-- tamaño del array de Conductores en memoria
 int fActual;
 
-struct rConductor{
+struct rConductorArchivo{
     int conductorID;
     int fVto;
     bool activo;
     int totInfracciones;
     char eMail[100];
+};
+
+struct rConductorNodo{
+    int conductorID;
+    int fVto;
+    bool activo;
+    int totInfracciones;
+    char eMail[100];
+    rConductorNodo *sgte;
     // string eMail;
 };
+
+rConductorNodo *listaConduc = NULL;
+rConductorNodo *finalConduc = NULL;
 
 struct rInfraccion{
     int infraccionID;
@@ -33,8 +43,6 @@ struct rInfraccion{
     int conductorID;
     int provincia;
 };
-
-rConductor arrayConduc[1];
 
 int MostrarMenu() {
     int opcionMenu;
@@ -72,33 +80,42 @@ int MostrarMenu() {
     return opcionMenu;
 }
 
+rConductorNodo *BuscarConductor (int conductorID){
+    rConductorNodo *pAux = listaConduc;
+    bool encontrado =false;
+    while (pAux != NULL && encontrado == false){
+        if (pAux->conductorID == conductorID)
+            encontrado = true;
+        else
+            pAux = pAux->sgte;
+    }
+
+    return pAux;
+}
 
 void LevantarArchivo(bool MostrarMensajes){
     FILE *f;
-    rConductor r;
+    rConductorArchivo r;
+    rConductorNodo *pNodo;
     f = fopen("D:\\utnTrabajos\\Conductores.bin","rb");
 
-    fseek( f, 0, SEEK_END );
-    int tamanoArchivo = ftell(f);
+    while ( fread(&r,sizeof(rConductorArchivo),1,f) ) {
 
-    nRegistros = tamanoArchivo / sizeof(rConductor);
-    if (MostrarMensajes)
-        cout << "total reg. leidos: " << nRegistros << endl;
-
-    nTope = nRegistros + 10;
-    arrayConduc[nTope];
-
-    fseek( f, 0, 0 );
-    int i=0;
-    while ( fread(&r,sizeof(rConductor),1,f) ) {
-
-        arrayConduc[i].conductorID = r.conductorID;
-        arrayConduc[i].fVto = r.fVto;
-        arrayConduc[i].activo = r.activo;
-        arrayConduc[i].totInfracciones = r.totInfracciones;
+        pNodo = new rConductorNodo();
+        pNodo->conductorID = r.conductorID;
+        pNodo->fVto = r.fVto;
+        pNodo->activo = r.activo;
+        pNodo->totInfracciones = r.totInfracciones;
         //arrayConduc[i].eMail = r.eMail; no se puede hacer por ser variable array de char
-        memcpy(arrayConduc[i].eMail, r.eMail, 100);
-        i++;
+        memcpy(pNodo->eMail, r.eMail, 100);
+        pNodo->sgte = NULL;
+
+        if (listaConduc == NULL)
+            listaConduc = pNodo;
+        else
+            finalConduc->sgte = pNodo;
+
+        finalConduc = pNodo;
 
         if (MostrarMensajes)
             cout << r.conductorID << ", " << r.fVto << ", " << r.activo << ", " << r.totInfracciones << ", " << r.eMail << endl;
@@ -115,24 +132,20 @@ void LevantarArchivo(bool MostrarMensajes){
 int CargarNuevoConductor(){
     system("cls");
 
-    rConductor r ;
+    rConductorArchivo r ;
 
     cout << "ingrese los datos del conductor \n";
     cout << "Conductor ID: ";
     cin >> r.conductorID;
-    int i=0;
-    bool existe = false;
-    while (i  < nRegistros && !existe){
-       if( r.conductorID ==  arrayConduc[i].conductorID)
-        existe = true;
-       i++;
-    }
 
-    if (existe){
+    rConductorNodo *pNodo = BuscarConductor(r.conductorID);
+
+    if (pNodo != NULL){
         cout << "el conductor ingresado ya existe"<< endl;
         system("pause");
         return 0;
     }
+
     int EvaluarFecha = 1;
     while (EvaluarFecha == 1){
         cout << "fecha de vencimiento(AAAAMMDD): ";
@@ -149,13 +162,22 @@ int CargarNuevoConductor(){
     cout << "eMail: ";
     cin >> r.eMail;
 
-    i = nRegistros;
-    arrayConduc[i].conductorID = r.conductorID;
-    arrayConduc[i].fVto = r.fVto;
-    arrayConduc[i].activo = true;
-    arrayConduc[i].totInfracciones = 0;
-    memcpy(arrayConduc[i].eMail, r.eMail, 100);
-    nRegistros++;
+    pNodo = new rConductorNodo();
+    pNodo->conductorID = r.conductorID;
+    pNodo->fVto = r.fVto;
+    pNodo->activo = true;
+    pNodo->totInfracciones = 0;
+    //arrayConduc[i].eMail = r.eMail; no se puede hacer por ser variable array de char
+    memcpy(pNodo->eMail, r.eMail, 100);
+    pNodo->sgte = NULL;
+
+    if (listaConduc == NULL)
+        listaConduc = pNodo;
+    else
+        finalConduc->sgte = pNodo;
+
+    finalConduc = pNodo;
+
 
     cout << "\n\n>> El conductor se ha ingresado con exito!!"<< endl;
     system("pause");
@@ -169,29 +191,26 @@ void DesactivarConductor(){
 	bool encontrado = false;
 	cout << "Ingrese el ID del conductor que desea desactivar" << endl;
 	cin >> IDbuscado;
-    int i=0;
-	while (!encontrado && i < nRegistros){
-		if (arrayConduc[i].conductorID == IDbuscado){
-            encontrado = true;
-            if (arrayConduc[i].activo){
-                 cout << "el conductor se ha encontrado y ha sido desactivado" << endl;
-                 arrayConduc[i].activo = false;
-            }
-            else
-                cout << "El conductor ya se encontraba desactivado. No se realizo ningun cambio."<< endl;
-		}
-        i++;
-	}
 
-	if (encontrado == false)
-		cout << "ERROR: no hay ningún conductor que coincida con el ID buscado. " << endl;
+    rConductorNodo *pNodo= BuscarConductor(IDbuscado);
+
+    if (pNodo != NULL){
+        if (pNodo->activo){
+             pNodo->activo = false;
+             cout << "el conductor se ha encontrado y ha sido desactivado" << endl;
+        }
+        else{
+            cout << "El conductor ya se encontraba desactivado. No se realizo ningun cambio."<< endl;
+        }
+    } else {
+        cout << "ERROR: no hay ningun conductor que coincida con el ID buscado. " << endl;
+    }
 
 	system("pause");
 
 }
 
-bool BuscarInfraccion(int conductorID, int provBuscada)
-{
+bool BuscarInfraccion(int conductorID, int provBuscada) {
 	FILE * f;
 	rInfraccion infraccion;
 	f = fopen("D:\\utnTrabajos\\procesados.bin", "r");
@@ -204,10 +223,21 @@ bool BuscarInfraccion(int conductorID, int provBuscada)
 }
 
 void ConductoresConInfraccion(){
-	int numProv;
-	bool TenerInfraccion;
+    struct rListado{
+        int conductorID;
+        char eMail[100];
+        rListado *sgte;
+    };
 
-	cout << "Indique el numero de provincia que desea buscar: "<< endl;
+    rListado *pListado = NULL;
+    rListado *pUltimo = NULL;
+    rListado *pNodo;
+    rListado r;
+	int numProv;
+    rConductorNodo *pAux;
+    bool encontrado;
+
+    cout << "Indique el numero de provincia que desea buscar: "<< endl;
 	cin >> numProv;
 
 	while(numProv < 0 || numProv > 23){
@@ -215,26 +245,86 @@ void ConductoresConInfraccion(){
 		cout << "Vuelva a ingresar el numero. " << endl;
 		cin >> numProv;
 	}
-
     if (numProv == 0) //con 0 sale sin buscar
         return;
 
-	for (int i=0; i < nRegistros; i++)
-	{
-		TenerInfraccion = BuscarInfraccion(arrayConduc[i].conductorID, numProv);
+    FILE * f;
+	rInfraccion infraccion;
+	f = fopen("D:\\utnTrabajos\\procesados.bin", "r");
+    while (fread(&infraccion, sizeof(rInfraccion), 1, f)){
 
-		if (TenerInfraccion){
-            cout << "Conductor: " << arrayConduc[i].conductorID << "   ";
-            cout << "Fecha de vencimiento: " << arrayConduc[i].fVto << "   ";
-            if (arrayConduc[i].activo)
-               cout << "Estado: activo" << endl;
-            else
-               cout << "Estado: inactivo" << endl;
-             cout << "----------------------------------------------" << endl;
+        if(infraccion.provincia == numProv){
+            encontrado = false;  // <-- se inicializa acá porqe hay que hacerlo por cada busqueda.
+
+            // Si la lista de "encontrados" tiene algo...
+            if (pListado != NULL ){
+                pUltimo = pListado;
+
+                // ...busco para ver si ya está el infractor de la infracción recién leída.
+                while (pUltimo->conductorID != infraccion.conductorID && pUltimo->sgte != NULL)
+                    pUltimo = pUltimo->sgte;
+
+                if (pUltimo->conductorID == infraccion.conductorID)
+                    encontrado = true;
+            }
+
+           // Si el infracctor de la infracción no existe en la lista...
+           if (!encontrado) {
+                // busco los datos del conductor
+               pAux = BuscarConductor(infraccion.conductorID);
+
+               // creo el nodo y lo valorizo
+               pNodo = new rListado();
+               pNodo->conductorID = pAux->conductorID;
+               memcpy( pNodo->eMail, pAux->eMail, 100);
+               pNodo->sgte = NULL;
+
+               // Agrego el nodo a la lista: si está vacía, lo pongo al principio
+               if (pListado == NULL)
+                pListado = pNodo;
+               else
+                  // si tiene datos, lo pongo al final.
+                pUltimo->sgte = pNodo;
+           }
+
         }
-	}
-	system("pause");
+
+    }
+	fclose(f);
+
+// ahora ajustamos esto: La manera de saber si "hay datos en la lista" es verificando pListado
+    if(pListado == NULL){
+         cout<< "No hay infracctores en dicha provincia" << endl;
+         system("pause");
+         return;
+    }
+
+    // Desde aquí: se imprime primero la cabecera que tendrá el listado
+    cout << "Conductores con infraccion en la provincia: " << numProv << endl;
+    cout << "--------------------------------------------------------------------------" << endl;
+    cout << "Conductor ID     e-mail "  ;
+    cout << "------------     ---------------------------------------------";
+
+    // adentro del WHILE: se recorre pListado y se imprime el detalle.
+
+    // No tenés que usar pListado para recorrer pq vas a perder el puntero al primer nodo.
+    // Podés reutilizar acá pUltimo para recorrer.
+    // luego de imprimir cada conductor podés aprovechar para hacer el free(nodo);
+
+    pUltimo = pListado;
+    while (pUltimo != NULL){
+        cout << "    " << pUltimo->conductorID << "      " <<  pUltimo->eMail << endl;
+        // corro el puntero al nodo recién listado
+        pListado = pUltimo;
+        // avanzo el puntero al siguente
+        pUltimo = pUltimo->sgte;
+        // libero la memoria del nodo que ya se imprimió.
+        free(pListado);
+    }
+    // FIN
+    system("pause");
 }
+
 
 void ProcesarLoteInfraccion(){
     FILE *fNuevas;
@@ -244,6 +334,7 @@ void ProcesarLoteInfraccion(){
     bool existe;
     int CasosLeidos=0;
     int CasosNoExiste=0;
+    rConductorNodo *pNodo;
 
     // Se lee el archivo con nuevas infracciones.
     fNuevas = fopen("D:\\utnTrabajos\\infracciones.bin","rb");
@@ -257,20 +348,12 @@ void ProcesarLoteInfraccion(){
         fwrite(&r, sizeof(rInfraccion), 1, fProce);
 
         // Verifico si existe el Conductor de la infraccion recien leida.
-        i=0;
-        existe = false;
-        while (i  < nRegistros && !existe){
-           if( r.conductorID ==  arrayConduc[i].conductorID)
-            existe = true;
+        pNodo = BuscarConductor(r.conductorID);
 
-          i++;
-        }
-
-        if (!existe){
+        if (pNodo!= NULL)
+            pNodo->totInfracciones++;
+        else
             CasosNoExiste++;
-        }
-
-
     }
 
     fclose(fNuevas);
@@ -287,7 +370,7 @@ void ProcesarLoteInfraccion(){
 
 }
 
-void ImprimirDetalleInfraccciones(int condID) {
+void ImprimirDetalleInfraccciones(int condID){
 
     FILE *f;
     rInfraccion r;
@@ -314,8 +397,7 @@ void InformePantallaInfracciones(){
     string activoSiNo;
     system("cls");
 
-    if (nRegistros == 0) {
-
+    if (listaConduc == NULL) {
         cout << "Informe de conductores con detalle de infracciones. \n";
         cout << "  No se han cargado los datos aun. Por favor, utilice la opcion 1 del menu. \n";
         system ("pause");
@@ -326,21 +408,23 @@ void InformePantallaInfracciones(){
     cout << "--------------------------------------------------------------------------------------------" << endl;
     cout << "ConductorID  F.Vencimiento  Activo  TotInfracciones  eMail \n";
     cout << "-----------  -------------  ------  ---------------  ---------------------------------------" << endl;
-    for (int i=0; i< nRegistros; i++){
+    rConductorNodo *pNodo =listaConduc ;
 
-        if (arrayConduc[i].activo == true)
+    while (pNodo != NULL){
+
+        if (pNodo->activo == true)
             activoSiNo = "SI";
         else
             activoSiNo = "NO";
-        cout << "  " << arrayConduc[i].conductorID << "         ";
-        cout << arrayConduc[i].fVto << "      ";
+        cout << "  " << pNodo->conductorID << "         ";
+        cout << pNodo->fVto << "      ";
         cout << activoSiNo << "          ";
-        cout << arrayConduc[i].totInfracciones << "       ";
-        cout << arrayConduc[i].eMail << endl;
+        cout << pNodo->totInfracciones << "       ";
+        cout << pNodo->eMail << endl;
 
 
-        ImprimirDetalleInfraccciones(arrayConduc[i].conductorID);
-
+        ImprimirDetalleInfraccciones(pNodo->conductorID);
+        pNodo = pNodo->sgte;
     }
 
 /*
@@ -352,7 +436,7 @@ void InformePantallaInfracciones(){
     system("pause");
 }
 
-void RegistoVencidoEntreFechasHTML(rConductor v[], int tam){
+void RegistoVencidoEntreFechasHTML(rConductorNodo *pLista){
     int fecha1, fecha2;
 
     cout << "ingrese las fechas entre las cuales quiere un informe de conductores vencidos\n";
@@ -372,12 +456,13 @@ void RegistoVencidoEntreFechasHTML(rConductor v[], int tam){
     fprintf (pFile,"<html><head>Informe</head><title>Informe HTML</title><body><table>");
     // Encabezados de columnas de la tabla que mostrará la info del conductor.
     fprintf (pFile,"<tr><td>Conductor ID</td><td>F.Vencimiento</td><td>e-mail</td>");
-    for (int i=0; i<tam; i++){
-        if((v[i].fVto)< fActual && (v[i].fVto) < fecha2 && (v[i].fVto) > fecha1 ){
+    while(pLista !=NULL){
+        if((pLista->fVto)< fActual && (pLista->fVto) < fecha2 && (pLista->fVto) > fecha1 ){
             fprintf (pFile, "<tr>\n");
-            fprintf (pFile,"<tr><td>%d</td><td>%d</td><td>%s</td>", v[i].conductorID, v[i].fVto, v[i].eMail);
+            fprintf (pFile,"<tr><td>%d</td><td>%d</td><td>%s</td>", pLista->conductorID, pLista->fVto, pLista->eMail);
             fprintf (pFile, "<tr>\n");
         }
+        pLista = pLista->sgte;
     }
     fprintf (pFile, "</table></body></html>");
     fclose (pFile);
@@ -385,7 +470,7 @@ void RegistoVencidoEntreFechasHTML(rConductor v[], int tam){
     system("pause");
 }
 
-void RegistoVencidoEntreFechasCSV(rConductor v[], int tam){
+void RegistoVencidoEntreFechasCSV(rConductorNodo *pLista){
     int fecha1, fecha2;
 
     cout << "ingrese las fechas entre las cuales quiere un informe de conductores vencidos\n";
@@ -404,34 +489,17 @@ void RegistoVencidoEntreFechasCSV(rConductor v[], int tam){
     // Encabezados de columnas de la tabla que mostrará la info del conductor.
 
     fprintf (pFile, "Conductor ID;F.Vencimiento;e-mail\n");
-    for (int i=0; i<tam; i++){
-           cout<< "Registro:" << i << endl;
-        if((v[i].fVto)< fActual && (v[i].fVto) < fecha2 && (v[i].fVto) > fecha1 ){
-            fprintf (pFile, "%d,%d,%s\n", v[i].conductorID, v[i].fVto, v[i].eMail);
-        cout<< "vencimiento:" << v[i].fVto << endl;
+    while(pLista != NULL){
+        if((pLista->fVto)< fActual && (pLista->fVto) < fecha2 && (pLista->fVto) > fecha1 ){
+            fprintf (pFile, "%d,%d,%s\n", pLista->conductorID, pLista->fVto, pLista->eMail);
         }
+        pLista = pLista->sgte;
     }
     fclose (pFile);
     cout<< "Informe generado con exito CSV.\n";
     system("pause");
 }
 
-int CalcularInfracciones(int condID){
-
-    FILE *f;
-    rInfraccion r;
-    f = fopen("D:\\utnTrabajos\\procesados.bin","rb");
-    int totalInfracciones=0;
-
-    while ( fread(&r, sizeof(rInfraccion), 1, f) ) {
-        if (r.conductorID == condID){
-           totalInfracciones++;
-        }
-    }
-
-    fclose(f);
-    return totalInfracciones;
-}
 
 // Al finalizar el día se reescribe el archivo “Conductores.bin” con los registros de aquellos
 // conductores a los que no se le ha vencido su carnet y que estén activos.
@@ -443,21 +511,31 @@ void FinalizarJornada(){
     int nRegVencidos = 0;
 
     f=fopen("D:\\utnTrabajos\\Conductores.bin","wb");
-    for (i=0; i < nRegistros; i++) {
-        if (arrayConduc[i].activo == true &&  arrayConduc[i].fVto >= fActual){
 
-            arrayConduc[i].totInfracciones = CalcularInfracciones(arrayConduc[i].conductorID);
+    rConductorNodo *pNodo =listaConduc ;
+    rConductorArchivo r;
 
-            fwrite(&arrayConduc[i], sizeof(rConductor),1,f);
+    while (pNodo != NULL){
+        r.conductorID = pNodo->conductorID;
+        memcpy(r.eMail, pNodo->eMail, 100);
+        r.fVto = pNodo->fVto;
+        r.totInfracciones = pNodo->totInfracciones;
+        r.activo = pNodo->activo;
+
+        if (pNodo->activo == true &&  pNodo->fVto >= fActual){
+            fwrite(&r, sizeof(rConductorArchivo),1,f);
             nRegOK++;
         }
 
-        if (arrayConduc[i].activo == false)
+        if (pNodo->activo == false)
             nRegInactivos++;
 
-        if (arrayConduc[i].fVto < fActual)
+        if (pNodo->fVto < fActual)
             nRegVencidos++;
-     }
+
+        pNodo = pNodo->sgte;
+    }
+
     fclose(f);
     cout << "proceso terminado...\n";
     cout << "Cantidad de registros grabados: " << nRegOK << endl;
@@ -467,39 +545,31 @@ void FinalizarJornada(){
     system("pause");
 }
 
-void GrabarConductores(){
-
-    FILE *f;
-    f=fopen("D:\\utnTrabajos\\Conductores.bin","wb");
-    for (int i = 0 ; i < nRegistros; i++) {
-            fwrite(&arrayConduc[i], sizeof(rConductor),1,f);
-     }
-    fclose(f);
-}
-
 
 void SalirPrograma(){
+    rConductorNodo *pNodo = listaConduc;
+    rConductorNodo *pAux;
+
+    // Recorro la lista para liberar la mermoria.
+    while (pNodo != NULL){
+        pAux = pNodo;
+        free(pNodo);
+        pNodo = pAux->sgte;
+    }
 }
 
 void RegistrarInfraccion(){
     system("cls");
     rInfraccion r ;
-    int verificarConductor;
+
     cout << "ingrese los datos de la infraccion \n";
 
     cout << "Conductor ID: ";
-    cin >> verificarConductor;
-    int i=0;
-    bool existe = true;
-    while (i  < nRegistros && existe == true){
-       if( verificarConductor == arrayConduc[i].conductorID){
-         existe = false;
-         r.conductorID = verificarConductor;
-       }
-       i++;
-    }
+    cin >> r.conductorID;
 
-    if (existe){
+    rConductorNodo *pNodo = BuscarConductor(r.conductorID);
+
+    if (pNodo == NULL){
         cout << "El ID del conductor ingresado no existe"<< endl;
         system("pause");
         return ;
@@ -527,11 +597,13 @@ void RegistrarInfraccion(){
             cout << "No existe la provincia ingresada. Debe estar entre 1 y 23." << endl;
     }
 
-
     FILE *f;
     f=fopen("D:\\utnTrabajos\\infracciones.bin","ab");
     fwrite(&r, sizeof(rInfraccion),1,f);
     fclose(f);
+
+    // OJO: las infracciones sólo se acumularán al Procesar el Lote con la opción 5 del menú.
+    // pNodo->totInfracciones++;
 
     cout << "infraccion grabada con exito\n";
     system("pause");
@@ -564,13 +636,7 @@ int main()
             case 1: LevantarArchivo(true);
                     break;
 
-            case 2: if (cantNuevos == 10) {
-                       GrabarConductores();
-                       LevantarArchivo(false);
-                       cantNuevos = 0;
-                    }
-
-                    cantNuevos += CargarNuevoConductor();
+            case 2: CargarNuevoConductor();
                     break;
 
             case 3: DesactivarConductor();
@@ -585,22 +651,21 @@ int main()
             case 6: InformePantallaInfracciones();
                     break;
 
-            case 7: RegistoVencidoEntreFechasHTML(arrayConduc, nRegistros);
+            case 7: RegistoVencidoEntreFechasHTML(listaConduc);
                     break;
 
-            case 8: RegistoVencidoEntreFechasCSV(arrayConduc, nRegistros);
+            case 8: RegistoVencidoEntreFechasCSV(listaConduc);
                     break;
 
             case 9: FinalizarJornada();
+                    SalirPrograma();
                     break;
 
             case 10: RegistrarInfraccion();
                     break;
 
-            case 0: if (cantNuevos > 0)
-                        SalirPrograma();
+            case 0: SalirPrograma();
                     break;
-
 
         }
     }
